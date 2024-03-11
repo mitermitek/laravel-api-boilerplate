@@ -2,7 +2,13 @@
 
 namespace App\Exceptions;
 
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -31,7 +37,25 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $e)
     {
         if ($request->expectsJson()) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            $response = [
+                'error' => $e->getMessage(),
+            ];
+            $httpCode = 500;
+
+            if ($e instanceof AuthenticationException) {
+                $httpCode = 401;
+            } elseif ($e instanceof AuthorizationException) {
+                $httpCode = 403;
+            } elseif ($e instanceof ModelNotFoundException || $e instanceof NotFoundHttpException) {
+                $httpCode = 404;
+            } elseif ($e instanceof TokenMismatchException) {
+                $httpCode = 419;
+            } elseif ($e instanceof ValidationException) {
+                $httpCode = 422;
+                $response['errors'] = $e->validator->errors();
+            }
+
+            return response()->json($response, $httpCode);
         }
 
         return parent::render($request, $e);
